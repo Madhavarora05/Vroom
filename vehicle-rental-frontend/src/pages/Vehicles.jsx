@@ -8,19 +8,22 @@ const Vehicles = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchModels = async () => {
-      try {
-        const res = await axiosInstance.get("/api/users/car-models");
-        setModels(res.data);
-      } catch (err) {
-        console.error("Error fetching car models:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchModels = async () => {
+    try {
+      const res = await axiosInstance.get("/api/users/car-models");
+      console.log("Fetched models:", res.data);
+      setModels(Array.isArray(res.data) ? res.data : []);
+    } catch (err) {
+      console.error("Error fetching car models:", err);
+      setModels([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchModels();
-  }, []);
+  fetchModels();
+}, []);
+
 
   return (
     <div className="p-6">

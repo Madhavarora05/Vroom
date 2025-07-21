@@ -29,5 +29,16 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         return userRepository.save(user);
     }
+    
+    public Optional<User> authenticateUser(String email, String password) {
+        Optional<User> user = userRepository.findByEmail(email);
+        if (user.isPresent() && passwordEncoder.matches(password, user.get().getPassword())) {
+            return user;
+        }
+        throw new RuntimeException("Invalid credentials");
+    }
+
+
+
 }
 
