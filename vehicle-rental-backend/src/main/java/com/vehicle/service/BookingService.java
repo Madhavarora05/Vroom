@@ -1,116 +1,68 @@
 package com.vehicle.service;
 
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import com.vehicle.dto.BookingRequest;
 import com.vehicle.model.Booking;
 import com.vehicle.model.CarUnit;
 import com.vehicle.model.User;
 import com.vehicle.repository.BookingRepository;
 import com.vehicle.repository.CarUnitRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 public class BookingService {
-
+    
     @Autowired
     private BookingRepository bookingRepository;
-
+    
     @Autowired
     private CarUnitRepository carUnitRepository;
-
+    
     public List<Booking> getUserBookings(Long userId) {
-        return bookingRepository.findByUserId(userId);
-    }
-
-    public boolean hasConflict(Long userId, LocalDateTime start, LocalDateTime end) {
-        return !bookingRepository.findConflictingBookings(userId, start, end).isEmpty();
+        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
     
-    private double calculateRentalAmount(LocalDateTime start, LocalDateTime end, String rentalType, double perHourRate, double perDayRate) {
-        long minutes = java.time.Duration.between(start, end).toMinutes();
+    public Booking createBooking(User user, BookingRequest request) {
+        CarUnit carUnit = carUnitRepository.findById(request.getCarUnitId())
+            .orElseThrow(() -> new RuntimeException("Car unit not found"));
 
-        if (rentalType.equalsIgnoreCase("HOURLY")) {
-            double hours = Math.ceil(minutes / 60.0); // round up to next hour
-            return hours * perHourRate;
-        } else if (rentalType.equalsIgnoreCase("DAILY")) {
-            double days = Math.ceil(minutes / (24 * 60.0)); // round up to next day
-            return days * perDayRate;
-        } else {
-            throw new IllegalArgumentException("Invalid rental type: " + rentalType);
-        }
-    }
-
-
-    public Booking createBooking(User user, CarUnit unit, LocalDateTime start, LocalDateTime end, String rentalType) {
-        if (hasConflict(user.getId(), start, end)) {
-            throw new RuntimeException("You already have a booking during this time.");
+        if (!isUnitAvailable(request.getCarUnitId(), request.getStartDate(), request.getEndDate())) {
+            throw new RuntimeException("Car unit is not available for the selected dates");
         }
 
-        unit.setAvailable(false); // mark the unit unavailable
-        carUnitRepository.save(unit);
+        // Calculate total cost (daily rate * number of days)
+        long days = ChronoUnit.DAYS.between(request.getStartDate(), request.getEndDate());
+        if (days <= 0) {
+            days = 1; // Minimum 1 day
+        }
+        double totalCost = carUnit.getCarModel().getPerDayRate() * days;
 
-        Booking booking = new Booking();
-        booking.setUser(user);
-        booking.setCarUnit(unit);
-        booking.setStartDateTime(start);
-        booking.setEndDateTime(end);
-        booking.setRentalType(rentalType.toUpperCase());
-        booking.setStatus("BOOKED");
-
-        // ✅ Calculate rental amount
-        double rentalAmount = calculateRentalAmount(start, end, rentalType, unit.getCarModel().getPerHourRate(), unit.getCarModel().getPerDayRate());
-        booking.setTotalAmount(rentalAmount);
-
+        Booking booking = new Booking(user, carUnit, request.getStartDate(), request.getEndDate(), totalCost);
         return bookingRepository.save(booking);
     }
     
-    public Booking returnBooking(Long bookingId, LocalDateTime actualReturnTime) {
-        Booking booking = bookingRepository.findById(bookingId)
+    private boolean isUnitAvailable(Long carUnitId, LocalDate startDate, LocalDate endDate) {
+        List<Booking> conflictingBookings = bookingRepository.findConflictingBookings(
+            carUnitId, startDate, endDate
+        );
+        return conflictingBookings.isEmpty();
+    }
+    
+    public Booking getBookingById(Long id) {
+        return bookingRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Booking not found"));
-
-        if (!booking.getStatus().equals("BOOKED")) {
-            throw new RuntimeException("Booking is not active");
-        }
-
-        booking.setActualReturnTime(actualReturnTime);
-        double fine = calculateFine(booking, actualReturnTime);
-        booking.setFine(fine);
-
-        booking.setTotalAmount(booking.getTotalAmount() + fine);
-        booking.setStatus("COMPLETED");
-
-        // Mark the car available again
-        CarUnit unit = booking.getCarUnit();
-        unit.setAvailable(true);
-        carUnitRepository.save(unit);
-
-        return bookingRepository.save(booking);
     }
     
-    private double calculateFine(Booking booking, LocalDateTime actualReturn) {
-        LocalDateTime expected = booking.getEndDateTime();
-        long delayMinutes = java.time.Duration.between(expected, actualReturn).toMinutes();
-
-        if (delayMinutes <= 0) return 0; // Returned on time
-
-        String rentalType = booking.getRentalType();
-        double hourlyRate = booking.getCarUnit().getCarModel().getPerHourRate();
-
-        if (rentalType.equalsIgnoreCase("HOURLY")) {
-            if (delayMinutes <= 30) return 0;
-            double halfHours = Math.ceil((delayMinutes - 30) / 30.0);
-            return halfHours * hourlyRate; // Per half-hour fine
-        } else if (rentalType.equalsIgnoreCase("DAILY")) {
-            if (delayMinutes <= 120) return 0;
-            double extraHours = Math.ceil((delayMinutes - 120) / 60.0);
-            return extraHours * hourlyRate;
-        } else {
-            throw new IllegalArgumentException("Invalid rental type for fine: " + rentalType);
+    public void cancelBooking(Long bookingId, Long userId) {
+        Booking booking = getBookingById(bookingId);
+        if (!booking.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Unauthorized to cancel this booking");
         }
+        bookingRepository.delete(booking);
     }
-
-
-
 }

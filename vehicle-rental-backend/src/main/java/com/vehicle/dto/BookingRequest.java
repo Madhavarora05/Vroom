@@ -1,17 +1,25 @@
 package com.vehicle.dto;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 public class BookingRequest {
-
     private Long userId;
-    private Long unitId;
-    private String rentalType; // HOURLY or DAILY
-    private LocalDateTime startDateTime;
-    private LocalDateTime endDateTime;
+    private Long carUnitId;
+    private LocalDate startDate;
+    private LocalDate endDate;
 
-    // Getters & Setters
+    // Default constructor
+    public BookingRequest() {}
 
+    // Constructor with parameters
+    public BookingRequest(Long userId, Long carUnitId, LocalDate startDate, LocalDate endDate) {
+        this.userId = userId;
+        this.carUnitId = carUnitId;
+        this.startDate = startDate;
+        this.endDate = endDate;
+    }
+
+    // Getters and Setters
     public Long getUserId() {
         return userId;
     }
@@ -20,35 +28,27 @@ public class BookingRequest {
         this.userId = userId;
     }
 
-    public Long getUnitId() {
-        return unitId;
+    public Long getCarUnitId() {
+        return carUnitId;
     }
 
-    public void setUnitId(Long unitId) {
-        this.unitId = unitId;
+    public void setCarUnitId(Long carUnitId) {
+        this.carUnitId = carUnitId;
     }
 
-    public String getRentalType() {
-        return rentalType;
+    public LocalDate getStartDate() {
+        return startDate;
     }
 
-    public void setRentalType(String rentalType) {
-        this.rentalType = rentalType;
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
     }
 
-    public LocalDateTime getStartDateTime() {
-        return startDateTime;
+    public LocalDate getEndDate() {
+        return endDate;
     }
 
-    public void setStartDateTime(LocalDateTime startDateTime) {
-        this.startDateTime = startDateTime;
-    }
-
-    public LocalDateTime getEndDateTime() {
-        return endDateTime;
-    }
-
-    public void setEndDateTime(LocalDateTime endDateTime) {
-        this.endDateTime = endDateTime;
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
     }
 }

@@ -1,171 +1,182 @@
 package com.vehicle.controller;
 
-import com.vehicle.model.CarModel;
-import com.vehicle.model.CarUnit;
-import com.vehicle.model.User;
-import com.vehicle.repository.BookingRepository;
-import com.vehicle.repository.CarModelRepository;
-import com.vehicle.repository.CarUnitRepository;
-import com.vehicle.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpSession;
-
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@RestController
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
-@RequestMapping("/api/users")
-public class UserController {
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
+import com.vehicle.dto.BookingRequest;
+import com.vehicle.model.Booking;
+import com.vehicle.model.CarModel;
+import com.vehicle.model.CarUnit;
+import com.vehicle.model.User;
+import com.vehicle.service.UserService;
+
+import jakarta.servlet.http.HttpSession;
+
+@RestController
+@RequestMapping("/api/users")
+@CrossOrigin(origins = "http://localhost:3000")
+public class UserController {
+    
     @Autowired
     private UserService userService;
     
-    @Autowired
-    private CarModelRepository carModelRepository;
-    
-    @Autowired
-    private CarUnitRepository carUnitRepository;
-    
-    @Autowired
-    private BookingRepository bookingRepository;
-
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@RequestBody User user) {
+    public ResponseEntity<?> registerUser(@RequestBody User user) {
         try {
-            User savedUser = userService.registerUser(user);
-            // Don't expose password in response
-            savedUser.setPassword(null);
-            
+            User registeredUser = userService.registerUser(user);
             Map<String, Object> response = new HashMap<>();
             response.put("message", "User registered successfully");
-            response.put("user", savedUser);
+            response.put("user", registeredUser);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Registration failed: " + e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
-
+    
     @PostMapping("/login")
-    public ResponseEntity<Map<String, Object>> login(@RequestBody User loginData, HttpSession session) {
+    public ResponseEntity<?> loginUser(@RequestBody Map<String, String> loginData, HttpSession session) {
         try {
-            Optional<User> userOpt = userService.authenticateUser(loginData.getEmail(), loginData.getPassword());
+            String email = loginData.get("email");
+            String password = loginData.get("password");
             
-            if (userOpt.isPresent()) {
-                User user = userOpt.get();
-                // Don't expose password
-                user.setPassword(null);
-                
-                // Store user in session
-                session.setAttribute("user", user);
-                session.setAttribute("userId", user.getId());
-                session.setAttribute("userEmail", user.getEmail());
+            Optional<User> user = userService.authenticateUser(email, password);
+            if (user.isPresent()) {
+                // Store user in session for admin authentication
+                session.setAttribute("user", user.get());
                 
                 Map<String, Object> response = new HashMap<>();
-                response.put("user", user);
                 response.put("message", "Login successful");
-                response.put("sessionId", session.getId());
-                
+                response.put("user", user.get());
                 return ResponseEntity.ok(response);
             } else {
-                Map<String, Object> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Invalid credentials");
-                return ResponseEntity.status(401).body(errorResponse);
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid credentials"));
             }
         } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Login failed: " + e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
-
+    
     @PostMapping("/logout")
-    public ResponseEntity<Map<String, Object>> logout(HttpSession session) {
+    public ResponseEntity<?> logoutUser(HttpSession session) {
         try {
-            // Invalidate the session
             session.invalidate();
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Logged out successfully");
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(Map.of("message", "Logout successful"));
         } catch (Exception e) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Logout failed: " + e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getUserById(@PathVariable Long id) {
+        try {
+            Optional<User> user = userService.getUserById(id);
+            if (user.isPresent()) {
+                return ResponseEntity.ok(user.get());
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/car-models")
+    public ResponseEntity<List<CarModel>> getAllCarModels() {
+        List<CarModel> carModels = userService.getAllCarModels();
+        return ResponseEntity.ok(carModels);
+    }
+    
+    @GetMapping("/available-units")
+    public ResponseEntity<List<CarUnit>> getAvailableUnits(
+            @RequestParam Long carModelId,
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        try {
+            LocalDate start = LocalDate.parse(startDate);
+            LocalDate end = LocalDate.parse(endDate);
+            List<CarUnit> availableUnits = userService.getAvailableUnits(carModelId, start, end);
+            return ResponseEntity.ok(availableUnits);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+    
+    @PostMapping("/{userId}/bookings")
+    public ResponseEntity<?> createBooking(@PathVariable Long userId, @RequestBody BookingRequest request) {
+        try {
+            Optional<User> user = userService.getUserById(userId);
+            if (user.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "User not found"));
+            }
+            
+            request.setUserId(userId); // Set the user ID from the path
+            Booking booking = userService.createBooking(user.get(), request);
+            return ResponseEntity.ok(booking);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+    
+    @GetMapping("/{userId}/bookings")
+    public ResponseEntity<List<Booking>> getUserBookings(@PathVariable Long userId) {
+        List<Booking> bookings = userService.getUserBookings(userId);
+        return ResponseEntity.ok(bookings);
+    }
+    
+    @PostMapping("/book")
+    public ResponseEntity<?> createBooking(@RequestBody BookingRequest request, HttpSession session) {
+        try {
+            User user = (User) session.getAttribute("user");
+            if (user == null) {
+                return ResponseEntity.status(403).body(Map.of("message", "Please login to make a booking"));
+            }
+            
+            request.setUserId(user.getId());
+            Booking booking = userService.createBooking(user, request);
+            return ResponseEntity.ok(booking);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
     }
     
     @GetMapping("/profile")
-    public ResponseEntity<Map<String, Object>> getProfile(HttpSession session) {
-        User user = (User) session.getAttribute("user");
-        
-        if (user == null) {
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Not authenticated");
-            return ResponseEntity.status(401).body(errorResponse);
+    public ResponseEntity<?> getUserProfile(HttpSession session) {
+        try {
+            User user = (User) session.getAttribute("user");
+            if (user == null) {
+                return ResponseEntity.status(403).body(Map.of("message", "Not authenticated"));
+            }
+            return ResponseEntity.ok(Map.of("user", user));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         }
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("user", user);
-        return ResponseEntity.ok(response);
     }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<User> getUser(@PathVariable Long id, HttpSession session) {
-        // Check if user is authenticated
-        Long sessionUserId = (Long) session.getAttribute("userId");
-        if (sessionUserId == null) {
-            return ResponseEntity.status(401).build();
+    
+    @GetMapping("/my-bookings")
+    public ResponseEntity<List<Booking>> getMyBookings(HttpSession session) {
+        try {
+            User user = (User) session.getAttribute("user");
+            if (user == null) {
+                return ResponseEntity.status(403).build();
+            }
+            List<Booking> bookings = userService.getUserBookings(user.getId());
+            return ResponseEntity.ok(bookings);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
         }
-        
-        return userService.getUserById(id)
-                .map(user -> {
-                    user.setPassword(null); // Don't expose password
-                    return ResponseEntity.ok(user);
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    // ✅ Get all car models (protected route)
-    @GetMapping("/car-models")
-    public ResponseEntity<List<CarModel>> getAllCarModels(HttpSession session) {
-        // Check authentication
-        if (session.getAttribute("userId") == null) {
-            return ResponseEntity.status(401).build();
-        }
-        
-        return ResponseEntity.ok(carModelRepository.findAll());
-    }
-
-    // ✅ Get available car units for a model between two times (protected route)
-    @GetMapping("/available-units")
-    public ResponseEntity<List<CarUnit>> getAvailableUnits(
-            @RequestParam Long modelId,
-            @RequestParam LocalDateTime start,
-            @RequestParam LocalDateTime end,
-            HttpSession session
-    ) {
-        // Check authentication
-        if (session.getAttribute("userId") == null) {
-            return ResponseEntity.status(401).build();
-        }
-        
-        List<Long> bookedUnitIds = bookingRepository.findBookedUnitIdsBetween(start, end);
-        List<CarUnit> availableUnits;
-        
-        if (bookedUnitIds.isEmpty()) {
-            availableUnits = carUnitRepository.findByCarModelIdAndAvailableTrue(modelId);
-        } else {
-            availableUnits = carUnitRepository.findByCarModelIdAndIdNotInAndAvailableTrue(modelId, bookedUnitIds);
-        }
-        
-        return ResponseEntity.ok(availableUnits);
     }
 }

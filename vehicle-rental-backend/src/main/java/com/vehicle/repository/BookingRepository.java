@@ -1,23 +1,31 @@
 package com.vehicle.repository;
 
-import com.vehicle.model.Booking;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.vehicle.model.Booking;
+
+@Repository
 public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     List<Booking> findByUserId(Long userId);
 
-    // Detect overlapping bookings by same user
-    @Query("SELECT b FROM Booking b WHERE b.user.id = :userId AND b.status = 'BOOKED' " +
-           "AND ((b.startDateTime < :end) AND (b.endDateTime > :start))")
-    List<Booking> findConflictingBookings(Long userId, LocalDateTime start, LocalDateTime end);
+    List<Booking> findByUserIdOrderByCreatedAtDesc(Long userId);
 
-    // Find all unit IDs that are booked during this time (for all users)
-    @Query("SELECT b.carUnit.id FROM Booking b WHERE " +
-           "(b.startDateTime < :end AND b.endDateTime > :start) AND b.status = 'BOOKED'")
-    List<Long> findBookedUnitIdsBetween(LocalDateTime start, LocalDateTime end);
+    @Query("SELECT b FROM Booking b WHERE b.carUnit.id = :carUnitId " +
+            "AND ((b.startDate BETWEEN :startDate AND :endDate) " +
+            "OR (b.endDate BETWEEN :startDate AND :endDate) " +
+            "OR (b.startDate <= :startDate AND b.endDate >= :endDate))")
+    List<Booking> findConflictingBookings(@Param("carUnitId") Long carUnitId,
+                                          @Param("startDate") LocalDate startDate,
+                                          @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT b FROM Booking b JOIN FETCH b.carUnit cu JOIN FETCH cu.carModel cm " +
+           "JOIN FETCH b.user u WHERE cm.sellerId = :sellerId ORDER BY b.createdAt DESC")
+    List<Booking> findBySellerIdWithDetails(@Param("sellerId") Long sellerId);
 }

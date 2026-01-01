@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql:
+    image: mysql:8.0
+    container_name: vroom-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: vehiclerental
+      MYSQL_USER: vroom
+      MYSQL_PASSWORD: vroom123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - vroom-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Backend Service
+  backend:
+    build:
+      context: ./vehicle-rental-backend
+      dockerfile: Dockerfile
+    container_name: vroom-backend
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/vehiclerental
+      SPRING_DATASOURCE_USERNAME: vroom
+      SPRING_DATASOURCE_PASSWORD: vroom123
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - vroom-network
+    restart: unless-stopped
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./vehicle-rental-frontend
+      dockerfile: Dockerfile
+    container_name: vroom-frontend
+    ports:
+      - "3000:80"
+    environment:
+      REACT_APP_BACKEND_URL: http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - vroom-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  vroom-network:
+    driver: bridge

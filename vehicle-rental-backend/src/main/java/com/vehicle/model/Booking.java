@@ -1,7 +1,15 @@
 package com.vehicle.model;
 
-import jakarta.persistence.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "bookings")
@@ -11,19 +19,6 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private LocalDateTime startDateTime;
-    private LocalDateTime endDateTime;
-
-    private String rentalType; // "HOURLY" or "DAILY"
-    private String status;     // "BOOKED", "RETURNED", "CANCELLED"
-    
-    private double totalAmount;
-    
-    private LocalDateTime actualReturnTime;
-    private double fine;
-
-
-
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User user;
@@ -32,45 +27,35 @@ public class Booking {
     @JoinColumn(name = "car_unit_id")
     private CarUnit carUnit;
 
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private double totalCost;
+    private String status; // PENDING, CONFIRMED, CANCELLED, COMPLETED
+    private LocalDateTime createdAt;
 
+    // Constructors
+    public Booking() {
+        this.createdAt = LocalDateTime.now();
+        this.status = "PENDING";
+    }
+
+    public Booking(User user, CarUnit carUnit, LocalDate startDate, LocalDate endDate, double totalCost) {
+        this.user = user;
+        this.carUnit = carUnit;
+        this.startDate = startDate;
+        this.endDate = endDate;
+        this.totalCost = totalCost;
+        this.status = "PENDING";
+        this.createdAt = LocalDateTime.now();
+    }
+
+    // Getters and Setters
     public Long getId() {
         return id;
     }
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public LocalDateTime getStartDateTime() {
-        return startDateTime;
-    }
-
-    public void setStartDateTime(LocalDateTime startDateTime) {
-        this.startDateTime = startDateTime;
-    }
-
-    public LocalDateTime getEndDateTime() {
-        return endDateTime;
-    }
-
-    public void setEndDateTime(LocalDateTime endDateTime) {
-        this.endDateTime = endDateTime;
-    }
-
-    public String getRentalType() {
-        return rentalType;
-    }
-
-    public void setRentalType(String rentalType) {
-        this.rentalType = rentalType;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
     }
 
     public User getUser() {
@@ -88,29 +73,44 @@ public class Booking {
     public void setCarUnit(CarUnit carUnit) {
         this.carUnit = carUnit;
     }
-    
-    public double getTotalAmount() {
-        return totalAmount;
+
+    public LocalDate getStartDate() {
+        return startDate;
     }
 
-    public void setTotalAmount(double totalAmount) {
-        this.totalAmount = totalAmount;
-    }
-    
-    public LocalDateTime getActualReturnTime() {
-        return actualReturnTime;
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
     }
 
-    public void setActualReturnTime(LocalDateTime actualReturnTime) {
-        this.actualReturnTime = actualReturnTime;
-    }
-    
-    public double getFine() {
-        return fine;
+    public LocalDate getEndDate() {
+        return endDate;
     }
 
-    public void setFine(double fine) {
-        this.fine = fine;
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
     }
-    
+
+    public double getTotalCost() {
+        return totalCost;
+    }
+
+    public void setTotalCost(double totalCost) {
+        this.totalCost = totalCost;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }

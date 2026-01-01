@@ -1,57 +1,66 @@
 package com.vehicle.controller;
 
+import com.vehicle.dto.BookingRequest;
 import com.vehicle.model.Booking;
-import com.vehicle.model.CarUnit;
 import com.vehicle.model.User;
 import com.vehicle.service.BookingService;
-import com.vehicle.service.CarUnitService;
 import com.vehicle.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/bookings")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "http://localhost:3000")
 public class BookingController {
-
+    
     @Autowired
     private BookingService bookingService;
-
-    @Autowired
-    private CarUnitService carUnitService;
-
+    
     @Autowired
     private UserService userService;
-
-    // ✅ Create a booking
+    
     @PostMapping
-    public Booking createBooking(@RequestParam Long userId,
-                                 @RequestParam Long carUnitId,
-                                 @RequestParam String startDateTime,
-                                 @RequestParam String endDateTime,
-                                 @RequestParam String rentalType) {
-        User user = userService.getUserById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        CarUnit unit = carUnitService.getById(carUnitId)
-                .orElseThrow(() -> new RuntimeException("Car unit not found"));
-
-        LocalDateTime start = LocalDateTime.parse(startDateTime);
-        LocalDateTime end = LocalDateTime.parse(endDateTime);
-
-        return bookingService.createBooking(user, unit, start, end, rentalType);
+    public ResponseEntity<?> createBooking(@RequestBody BookingRequest request) {
+        try {
+            Optional<User> user = userService.getUserById(request.getUserId());
+            if (user.isEmpty()) {
+                return ResponseEntity.badRequest().body("User not found");
+            }
+            
+            Booking booking = bookingService.createBooking(user.get(), request);
+            return ResponseEntity.ok(booking);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
-
-    // ✅ Get all bookings for a user
+    
     @GetMapping("/user/{userId}")
-    public List<Booking> getUserBookings(@PathVariable Long userId) {
-        return bookingService.getUserBookings(userId);
+    public ResponseEntity<List<Booking>> getUserBookings(@PathVariable Long userId) {
+        List<Booking> bookings = bookingService.getUserBookings(userId);
+        return ResponseEntity.ok(bookings);
     }
-    @PutMapping("/{bookingId}/return")
-    public Booking returnBooking(@PathVariable Long bookingId) {
-        return bookingService.returnBooking(bookingId, LocalDateTime.now());
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getBookingById(@PathVariable Long id) {
+        try {
+            Booking booking = bookingService.getBookingById(id);
+            return ResponseEntity.ok(booking);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+    
+    @DeleteMapping("/{id}/user/{userId}")
+    public ResponseEntity<?> cancelBooking(@PathVariable Long id, @PathVariable Long userId) {
+        try {
+            bookingService.cancelBooking(id, userId);
+            return ResponseEntity.ok("Booking cancelled successfully");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 }
